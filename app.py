@@ -2,48 +2,45 @@ import streamlit as st
 import requests
 import pandas as pd
 
-st.set_page_config(page_title="Meme Coin Mega Tracker", layout="wide")
-st.title("🚀 Meme Coin Mega Tracker (ETH & Base)")
+st.set_page_config(page_title="🔥 Gecko Meme Coin Tracker", layout="wide")
+st.title("🦎 Trending Meme Coins (via GeckoTerminal)")
 
 @st.cache_data(ttl=60)
-def get_dextools_top_pairs():
-    url = "https://api.dexscreener.com/latest/dex/pairs"
-    headers = {"User-Agent": "Mozilla/5.0"}
+def fetch_gecko_data():
+    url = "https://api.geckoterminal.com/api/v2/networks/eth/pools"
+    params = {"page": 1}
     try:
-        response = requests.get(url, headers=headers, timeout=10)
-        pairs = response.json().get("pairs", [])
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()["data"]
         
-        filtered = [
-            p for p in pairs 
-            if p["chainId"] in ["eth", "base"] and p["liquidity"]["usd"] > 10000
-        ]
+        trending = []
+        for item in data:
+            attributes = item["attributes"]
+            token_info = attributes["base_token"]
+            trending.append({
+                "Token": token_info["name"],
+                "Symbol": token_info["symbol"],
+                "Price ($)": float(attributes["base_token_price_usd"]),
+                "24h Volume ($)": int(attributes["volume_usd"]["h24"]),
+                "Liquidity ($)": int(attributes["reserve_in_usd"]),
+                "DEX": attributes["dex_name"],
+                "Pair Link": f'https://www.geckoterminal.com/eth/pools/{item["id"].split("/")[-1]}'
+            })
 
-        sorted_pairs = sorted(filtered, key=lambda x: x["volume"]["h24"], reverse=True)
+        # Sort by volume descending
+        trending_sorted = sorted(trending, key=lambda x: x["24h Volume ($)"], reverse=True)
+        return trending_sorted[:10]
 
-        return [
-            {
-                "Token": p["baseToken"]["name"],
-                "Symbol": p["baseToken"]["symbol"],
-                "Price ($)": round(float(p["priceUsd"]), 8),
-                "Market Cap ($)": int(p["fdv"]) if p["fdv"] else None,
-                "Liquidity ($)": int(p["liquidity"]["usd"]),
-                "24h Volume ($)": int(p["volume"]["h24"]),
-                "Buys/Sells": f'{p["txns"]["buys"]}/{p["txns"]["sells"]}',
-                "DEX": p["dexId"],
-                "View Pair": p["url"]
-            }
-            for p in sorted_pairs
-        ][:10]
     except Exception as e:
-        st.error(f"API Error: {e}")
+        st.error(f"Error fetching data: {e}")
         return []
 
-# Fetch and display
-with st.spinner("Loading trending meme pairs..."):
-    data = get_dextools_top_pairs()
+# Load and display
+with st.spinner("Loading live meme coins..."):
+    coins = fetch_gecko_data()
 
-if data:
-    df = pd.DataFrame(data)
+if coins:
+    df = pd.DataFrame(coins)
     st.dataframe(df, use_container_width=True)
 else:
-    st.warning("No trending pairs available or blocked API.")
+    st.warning("No data found.")
