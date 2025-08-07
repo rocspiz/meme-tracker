@@ -12,47 +12,58 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-def fetch_dexscreener_trending(chain):
-    url = f"https://api.dexscreener.com/latest/dex/tokens/trending?chain={chain}"
+def get_rising_memes(chain):
+    # DexScreener search with 'meme' for broad catch of meme tokens
+    url = f"https://api.dexscreener.com/latest/dex/search/?q=meme"
     try:
         r = requests.get(url, timeout=10)
         r.raise_for_status()
         data = r.json()
         if "pairs" not in data:
-            st.warning(f"No trending data for {chain}")
+            st.warning(f"No meme pairs found in API response")
             return []
+        # Only keep pairs on the right chain
+        meme_pairs = [
+            p for p in data["pairs"]
+            if p.get("chainId", "").lower() == chain.lower()
+        ]
+        # Calculate 24h % change (some may be None or missing)
+        for p in meme_pairs:
+            try:
+                p["priceChangePct"] = float(p.get("priceChange", "0").replace('%', ''))
+            except Exception:
+                p["priceChangePct"] = -9999
+        # Sort by biggest 24h price gain
+        meme_pairs = sorted(meme_pairs, key=lambda x: x["priceChangePct"], reverse=True)
         table = []
-        for pair in data["pairs"]:
-            price_change = pair.get("priceChange", "N/A")
-            vol_24h = pair.get("volume", {}).get("h24", "N/A")
+        for pair in meme_pairs[:25]:  # top 25 risers
             table.append({
-                "Name": pair.get("baseToken", {}).get("symbol", "N/A") + " / " + pair.get("quoteToken", {}).get("symbol", "N/A"),
+                "Name": f"{pair.get('baseToken', {}).get('symbol', 'N/A')} / {pair.get('quoteToken', {}).get('symbol', 'N/A')}",
+                "Dex": pair.get("dexId", "N/A"),
                 "Price (USD)": pair.get("priceUsd", "N/A"),
-                "24h Vol (USD)": vol_24h,
-                "Price Change 24h (%)": price_change,
+                "24h Vol (USD)": pair.get("volume", {}).get("h24", "N/A"),
+                "Price Change 24h (%)": pair.get("priceChange", "N/A"),
                 "Pair Link": f"[View]({pair.get('url', '')})"
             })
-        # Sort by highest price gain in 24h (descending)
-        table = sorted(table, key=lambda x: float(x["Price Change 24h (%)"].replace('%', '').replace('N/A', '-999')) if x["Price Change 24h (%)"] not in ["N/A", None] else -999, reverse=True)
         return table
     except Exception as e:
-        st.error(f"Failed to fetch {chain} data: {e}")
+        st.error(f"Failed to fetch meme coins for {chain}: {e}")
         return []
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### 🚀 Ethereum (DEX Screener)")
-    eth_data = fetch_dexscreener_trending("ethereum")
+    st.markdown("### 🚀 Ethereum Rising Meme Coins")
+    eth_data = get_rising_memes("ethereum")
     if eth_data:
         st.dataframe(pd.DataFrame(eth_data))
     else:
-        st.info("No trending meme coins found for Ethereum.")
+        st.info("No rising meme coins found for Ethereum.")
 
 with col2:
-    st.markdown("### 🛸 Base (DEX Screener)")
-    base_data = fetch_dexscreener_trending("base")
+    st.markdown("### 🛸 Base Rising Meme Coins")
+    base_data = get_rising_memes("base")
     if base_data:
         st.dataframe(pd.DataFrame(base_data))
     else:
-        st.info("No trending meme coins found for Base.")
+        st.info("No rising meme coins found for Base.")
