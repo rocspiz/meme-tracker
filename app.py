@@ -6,66 +6,53 @@ st.set_page_config(layout="wide")
 st.markdown(
     """
     <h1 style='display: flex; align-items: center; gap: 10px;'>
-        <img src='https://raw.githubusercontent.com/geckoterminal/geckoterminal-branding/main/logo/logo.svg' width='30'/>
-        Trending Meme Coins (via GeckoTerminal)
+        <span>🔥 Rising Meme Coins (via DexScreener)</span>
     </h1>
     """,
     unsafe_allow_html=True
 )
 
-def safe_float(val):
+def fetch_dexscreener_trending(chain):
+    url = f"https://api.dexscreener.com/latest/dex/tokens/trending?chain={chain}"
     try:
-        return round(float(val), 6)
-    except:
-        return "N/A"
-
-def safe_dollar(val):
-    try:
-        return f"${float(val):,.0f}"
-    except:
-        return "N/A"
-
-def fetch_trending_pools(network: str):
-    url = f"https://api.geckoterminal.com/api/v2/networks/{network}/trending_pools"
-    headers = {"accept": "application/json"}
-    try:
-        resp = requests.get(url, headers=headers)
-        resp.raise_for_status()
-        pools = resp.json()["data"]
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        if "pairs" not in data:
+            st.warning(f"No trending data for {chain}")
+            return []
+        table = []
+        for pair in data["pairs"]:
+            price_change = pair.get("priceChange", "N/A")
+            vol_24h = pair.get("volume", {}).get("h24", "N/A")
+            table.append({
+                "Name": pair.get("baseToken", {}).get("symbol", "N/A") + " / " + pair.get("quoteToken", {}).get("symbol", "N/A"),
+                "Price (USD)": pair.get("priceUsd", "N/A"),
+                "24h Vol (USD)": vol_24h,
+                "Price Change 24h (%)": price_change,
+                "Pair Link": f"[View]({pair.get('url', '')})"
+            })
+        # Sort by highest price gain in 24h (descending)
+        table = sorted(table, key=lambda x: float(x["Price Change 24h (%)"].replace('%', '').replace('N/A', '-999')) if x["Price Change 24h (%)"] not in ["N/A", None] else -999, reverse=True)
+        return table
     except Exception as e:
-        st.error(f"API Error for {network.upper()}: {e}")
+        st.error(f"Failed to fetch {chain} data: {e}")
         return []
-
-    table = []
-    for item in pools:
-        attr = item.get("attributes", {})
-        pool_id = item.get("id", "").split("_")[-1]
-        table.append({
-            "Pool": attr.get("name", "N/A"),
-            "Base Token": attr.get("base_token", {}).get("name", "N/A"),
-            "Quote Token": attr.get("quote_token", {}).get("name", "N/A"),
-            "Price (USD)": safe_float(attr.get("price_usd")),
-            "Volume (24h)": safe_dollar(attr.get("volume_usd")),
-            "Tx Count (24h)": attr.get("tx_count_24h", "N/A"),
-            "Link": f"[View](https://www.geckoterminal.com/{network}/pools/{pool_id})"
-        })
-    return table
-
-eth_data = fetch_trending_pools("eth")
-base_data = fetch_trending_pools("base")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### 🚀 Ethereum Trending Pools")
+    st.markdown("### 🚀 Ethereum (DEX Screener)")
+    eth_data = fetch_dexscreener_trending("ethereum")
     if eth_data:
         st.dataframe(pd.DataFrame(eth_data))
     else:
-        st.info("No Ethereum trending data found.")
+        st.info("No trending meme coins found for Ethereum.")
 
 with col2:
-    st.markdown("### 🛸 Base Trending Pools")
+    st.markdown("### 🛸 Base (DEX Screener)")
+    base_data = fetch_dexscreener_trending("base")
     if base_data:
         st.dataframe(pd.DataFrame(base_data))
     else:
-        st.info("No Base trending data found.")
+        st.info("No trending meme coins found for Base.")
