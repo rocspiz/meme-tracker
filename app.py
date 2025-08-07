@@ -4,58 +4,41 @@ import pandas as pd
 
 st.set_page_config(layout="wide")
 st.markdown(
-    """
-    <h1 style='display: flex; align-items: center; gap: 10px;'>
-        <span>🚀 Trending Exploding Coins (via DexScreener)</span>
-    </h1>
-    """,
+    "<h1>🚀 Trending Exploding Coins (via Birdeye / Solana)</h1>",
     unsafe_allow_html=True
 )
 
-def get_top_trending(chain, top_n=20):
-    url = f"https://api.dexscreener.com/latest/dex/trending/{chain}"
+def get_birdeye_trending(top_n=20):
+    url = "https://public-api.birdeye.so/public/trending"
     try:
         r = requests.get(url, timeout=10)
         r.raise_for_status()
         data = r.json()
-        pairs = data.get("pairs", [])
-        # Calculate 24h % change
-        for p in pairs:
+        tokens = data.get("data", [])
+        # Sort by 24h gain
+        for t in tokens:
             try:
-                p["priceChangePct"] = float(str(p.get("priceChange", "0")).replace('%', ''))
+                t["priceChangePct"] = float(t.get("priceChange24h", 0))
             except Exception:
-                p["priceChangePct"] = -9999
-        # Sort by biggest 24h price gain
-        pairs = sorted(pairs, key=lambda x: x["priceChangePct"], reverse=True)
+                t["priceChangePct"] = -9999
+        tokens = sorted(tokens, key=lambda x: x["priceChangePct"], reverse=True)
         table = []
-        for pair in pairs[:top_n]:
+        for token in tokens[:top_n]:
             table.append({
-                "Name": f"{pair.get('baseToken', {}).get('symbol', 'N/A')} / {pair.get('quoteToken', {}).get('symbol', 'N/A')}",
-                "Dex": pair.get("dexId", "N/A"),
-                "Price (USD)": pair.get("priceUsd", "N/A"),
-                "24h Vol (USD)": pair.get("volume", {}).get("h24", "N/A"),
-                "Price Change 24h (%)": pair.get("priceChange", "N/A"),
-                "Pair Link": f"[View]({pair.get('url', '')})"
+                "Name": token.get("tokenSymbol", "N/A"),
+                "Price (USD)": token.get("priceUsd", "N/A"),
+                "Volume (24h)": f"${token.get('volume24h', 0):,.0f}",
+                "Price Change 24h (%)": f"{token.get('priceChange24h', 0):.2f}",
+                "Pair Link": f"[View](https://birdeye.so/token/{token.get('address', '')})"
             })
         return table
     except Exception as e:
-        st.error(f"Failed to fetch trending pairs for {chain}: {e}")
+        st.error(f"Failed to fetch trending coins: {e}")
         return []
 
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown("### 🚀 Top 20 Trending Coins: Ethereum")
-    eth_data = get_top_trending("ethereum", top_n=20)
-    if eth_data:
-        st.dataframe(pd.DataFrame(eth_data))
-    else:
-        st.info("No trending coins found for Ethereum.")
-
-with col2:
-    st.markdown("### 🛸 Top 20 Trending Coins: Base")
-    base_data = get_top_trending("base", top_n=20)
-    if base_data:
-        st.dataframe(pd.DataFrame(base_data))
-    else:
-        st.info("No trending coins found for Base.")
+st.markdown("### 🟢 Top 20 Trending Coins: Solana (via Birdeye)")
+sol_data = get_birdeye_trending(20)
+if sol_data:
+    st.dataframe(pd.DataFrame(sol_data))
+else:
+    st.info("No trending coins found for Solana.")
