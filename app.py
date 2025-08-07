@@ -2,50 +2,61 @@ import streamlit as st
 import requests
 import pandas as pd
 
-st.set_page_config(page_title="🦎 Gecko Meme Tracker", layout="wide")
-st.title("🦎 Trending Meme Coins (via GeckoTerminal)")
+st.set_page_config(page_title="Meme Coin Mega Tracker", layout="wide")
+st.markdown("## 🦎 Trending Meme Coins (via GeckoTerminal)")
 
-@st.cache_data(ttl=60)
-def fetch_gecko_data():
-    networks = ["eth", "base"]
-    headers = {
-        "Accept": "application/json",
-        "User-Agent": "Mozilla/5.0"
-    }
+# Helper function to fetch trending pools from GeckoTerminal
+def fetch_gecko_data(network):
+    url = f"https://api.geckoterminal.com/api/v2/networks/{network}/pools?sort=trending"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        pools = data.get("data", [])
+        parsed = []
+        for item in pools:
+            attr = item["attributes"]
+            pool_name = attr.get("name", "Unknown")
+            base_token = attr.get("base_token", {}).get("name", "N/A")
+            quote_token = attr.get("quote_token", {}).get("name", "N/A")
+            price_usd = attr.get("price_usd", "N/A")
+            volume_usd = attr.get("volume_usd", "N/A")
+            tx_count = attr.get("tx_count_24h", "N/A")
+            url_slug = attr.get("url_slug", "")
+            pool_url = f"https://www.geckoterminal.com/network/{network}/pools/{url_slug}"
 
-    all_data = []
+            parsed.append({
+                "Pool": pool_name,
+                "Base Token": base_token,
+                "Quote Token": quote_token,
+                "Price (USD)": round(float(price_usd), 4) if price_usd else "N/A",
+                "Volume (24h)": f"${float(volume_usd):,.0f}" if volume_usd else "N/A",
+                "Tx Count (24h)": tx_count,
+                "Link": f"[View]({pool_url})"
+            })
 
-    for net in networks:
-        url = f"https://api.geckoterminal.com/api/v2/networks/{net}/pools/trending"
-        try:
-            response = requests.get(url, headers=headers, timeout=10)
-            response.raise_for_status()
-            json_data = response.json()["data"]
+        return parsed
+    except Exception as e:
+        st.error(f"API Error for {network.upper()}: {e}")
+        return []
 
-            for item in json_data:
-                attr = item.get("attributes", {})
-                token_info = attr.get("base_token", {})
-                all_data.append({
-                    "Token": token_info.get("name", "N/A"),
-                    "Symbol": token_info.get("symbol", "N/A"),
-                    "Price ($)": float(attr.get("price_usd", 0)),
-                    "Volume (24h)": float(attr.get("volume_usd", 0)),
-                    "Liquidity ($)": float(attr.get("liquidity_usd", 0)),
-                    "DEX": attr.get("dex_name", "N/A"),
-                    "Network": net,
-                    "Link": f'https://www.geckoterminal.com/{net}/pools/{item.get("id", "").split("_")[-1]}'
-                })
+# Layout
+col1, col2 = st.columns(2)
 
-        except Exception as e:
-            st.error(f"API Error for {net.upper()}: {e}")
+with col1:
+    st.subheader("🚀 Ethereum Trending Pools")
+    eth_data = fetch_gecko_data("eth")
+    if eth_data:
+        df_eth = pd.DataFrame(eth_data)
+        st.dataframe(df_eth, use_container_width=True)
+    else:
+        st.warning("No Ethereum trending data found.")
 
-    return all_data
-
-
-with st.spinner("Fetching trending data from GeckoTerminal..."):
-    data = fetch_gecko_data()
-
-if data:
-    st.dataframe(pd.DataFrame(data), use_container_width=True)
-else:
-    st.warning("No data found.")
+with col2:
+    st.subheader("🪐 Base Trending Pools")
+    base_data = fetch_gecko_data("base")
+    if base_data:
+        df_base = pd.DataFrame(base_data)
+        st.dataframe(df_base, use_container_width=True)
+    else:
+        st.warning("No Base trending data found.")
