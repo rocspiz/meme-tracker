@@ -7,41 +7,37 @@ st.title("🦎 Trending Meme Coins (via GeckoTerminal)")
 
 @st.cache_data(ttl=60)
 def fetch_gecko_data():
-    url = "https://api.geckoterminal.com/api/v2/networks/eth/pools"
-    params = {"page": 1}
+    url = "https://api.geckoterminal.com/api/v2/search/trending"
     try:
-        response = requests.get(url, params=params, timeout=10)
-        data = response.json()["data"]
+        response = requests.get(url, timeout=10)
+        data = response.json()["data"]["attributes"]["trending_pools"]
 
         trending = []
         for item in data:
             try:
-                attr = item["attributes"]
-                token = attr["tokens"]["base"]
+                token = item["base_token"]
                 trending.append({
-                    "Token": token["name"],
-                    "Symbol": token["symbol"],
-                    "Price ($)": float(token.get("price_usd", 0.0)),
-                    "24h Volume ($)": float(attr.get("volume_usd", {}).get("h24", 0)),
-                    "Liquidity ($)": float(attr.get("reserve_in_usd", 0)),
-                    "DEX": attr.get("dex_name", ""),
-                    "Pair Link": f'https://www.geckoterminal.com/eth/pools/{item["id"].split("/")[-1]}'
+                    "Token": token.get("name", ""),
+                    "Symbol": token.get("symbol", ""),
+                    "Price ($)": float(item.get("price_usd", 0.0)),
+                    "Volume (24h)": float(item.get("volume_usd", 0.0)),
+                    "Liquidity ($)": float(item.get("liquidity_usd", 0.0)),
+                    "DEX": item.get("dex_name", ""),
+                    "Pair Link": f'https://www.geckoterminal.com/{item.get("network", "eth")}/pools/{item.get("pool_address", "")}'
                 })
-            except Exception as inner_err:
+            except Exception:
                 continue
 
-        trending_sorted = sorted(trending, key=lambda x: x["24h Volume ($)"], reverse=True)
-        return trending_sorted[:10]
+        return trending
 
     except Exception as e:
-        st.error(f"Error fetching data: {e}")
+        st.error(f"API Error: {e}")
         return []
 
-with st.spinner("Loading data..."):
-    coins = fetch_gecko_data()
+with st.spinner("Loading trending coins..."):
+    data = fetch_gecko_data()
 
-if coins:
-    df = pd.DataFrame(coins)
-    st.dataframe(df, use_container_width=True)
+if data:
+    st.dataframe(pd.DataFrame(data), use_container_width=True)
 else:
     st.warning("No data found.")
