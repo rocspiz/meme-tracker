@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import pandas as pd
-import time
 
 st.set_page_config(layout="wide")
 st.markdown(
@@ -26,58 +25,34 @@ def safe_dollar(val):
     except:
         return "N/A"
 
-def fetch_gecko_data(network: str, delay_between_calls: float = 2.5):
-    base_url = f"https://api.geckoterminal.com/api/v2/networks/{network}/trending_pools"
+def fetch_trending_pools(network: str):
+    url = f"https://api.geckoterminal.com/api/v2/networks/{network}/trending_pools"
     headers = {"accept": "application/json"}
-
     try:
-        response = requests.get(base_url, headers=headers)
-        response.raise_for_status()
-        pools = response.json()["data"]
+        resp = requests.get(url, headers=headers)
+        resp.raise_for_status()
+        pools = resp.json()["data"]
     except Exception as e:
         st.error(f"API Error for {network.upper()}: {e}")
         return []
 
-    pool_data = []
+    table = []
     for item in pools:
-        full_id = item["id"]  # e.g., "eth_0xabc123..."
-        parts = full_id.split("_")
-        if len(parts) != 2:
-            st.warning(f"Unexpected pool ID format: {full_id}")
-            continue
+        attr = item.get("attributes", {})
+        pool_id = item.get("id", "").split("_")[-1]
+        table.append({
+            "Pool": attr.get("name", "N/A"),
+            "Base Token": attr.get("base_token", {}).get("name", "N/A"),
+            "Quote Token": attr.get("quote_token", {}).get("name", "N/A"),
+            "Price (USD)": safe_float(attr.get("price_usd")),
+            "Volume (24h)": safe_dollar(attr.get("volume_usd")),
+            "Tx Count (24h)": attr.get("tx_count_24h", "N/A"),
+            "Link": f"[View](https://www.geckoterminal.com/{network}/pools/{pool_id})"
+        })
+    return table
 
-        network_prefix = parts[0]
-        pool_id = parts[1]
-        pool_url = f"https://api.geckoterminal.com/api/v2/networks/{network_prefix}/pools/{pool_id}"
-
-        try:
-            pool_response = requests.get(pool_url, headers=headers)
-            if pool_response.status_code == 429:
-                st.warning(f"Rate limit hit while fetching pool {pool_id}, skipping.")
-                continue
-            pool_response.raise_for_status()
-            pool_info = pool_response.json()["data"]["attributes"]
-
-            pool_data.append({
-                "Pool": pool_info.get("name", "N/A"),
-                "Base Token": pool_info.get("base_token", {}).get("name", "N/A"),
-                "Quote Token": pool_info.get("quote_token", {}).get("name", "N/A"),
-                "Price (USD)": safe_float(pool_info.get("price_usd", "N/A")),
-                "Volume (24h)": safe_dollar(pool_info.get("volume_usd", "N/A")),
-                "Tx Count (24h)": pool_info.get("tx_count_24h", "N/A"),
-                "Link": f"[View](https://www.geckoterminal.com/{network_prefix}/pools/{pool_id})"
-            })
-
-        except Exception as e:
-            st.warning(f"Pool fetch error for {full_id}: {e}")
-
-        time.sleep(delay_between_calls)
-
-    return pool_data
-
-# Fetch and display Ethereum and Base separately
-eth_data = fetch_gecko_data("eth", delay_between_calls=2.5)
-base_data = fetch_gecko_data("base", delay_between_calls=2.5)
+eth_data = fetch_trending_pools("eth")
+base_data = fetch_trending_pools("base")
 
 col1, col2 = st.columns(2)
 
