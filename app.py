@@ -7,36 +7,40 @@ st.title("🦎 Trending Meme Coins (via GeckoTerminal)")
 
 @st.cache_data(ttl=60)
 def fetch_gecko_data():
-    url = "https://api.geckoterminal.com/api/v2/search/trending"
+    networks = ["eth", "base"]
     headers = {
         "Accept": "application/json",
         "User-Agent": "Mozilla/5.0"
     }
 
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
+    all_data = []
 
-        data = response.json()["data"]["attributes"]["trending_pools"]
+    for net in networks:
+        url = f"https://api.geckoterminal.com/api/v2/networks/{net}/pools/trending"
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            json_data = response.json()["data"]
 
-        trending = []
-        for item in data:
-            token = item.get("base_token", {})
-            trending.append({
-                "Token": token.get("name", "N/A"),
-                "Symbol": token.get("symbol", "N/A"),
-                "Price ($)": float(item.get("price_usd", 0)),
-                "Volume (24h)": float(item.get("volume_usd", 0)),
-                "Liquidity ($)": float(item.get("liquidity_usd", 0)),
-                "DEX": item.get("dex_name", "N/A"),
-                "Link": f'https://www.geckoterminal.com/{item.get("network", "eth")}/pools/{item.get("pool_address", "")}'
-            })
+            for item in json_data:
+                attr = item.get("attributes", {})
+                token_info = attr.get("base_token", {})
+                all_data.append({
+                    "Token": token_info.get("name", "N/A"),
+                    "Symbol": token_info.get("symbol", "N/A"),
+                    "Price ($)": float(attr.get("price_usd", 0)),
+                    "Volume (24h)": float(attr.get("volume_usd", 0)),
+                    "Liquidity ($)": float(attr.get("liquidity_usd", 0)),
+                    "DEX": attr.get("dex_name", "N/A"),
+                    "Network": net,
+                    "Link": f'https://www.geckoterminal.com/{net}/pools/{item.get("id", "").split("_")[-1]}'
+                })
 
-        return trending
+        except Exception as e:
+            st.error(f"API Error for {net.upper()}: {e}")
 
-    except Exception as e:
-        st.error(f"API Error: {e}")
-        return []
+    return all_data
+
 
 with st.spinner("Fetching trending data from GeckoTerminal..."):
     data = fetch_gecko_data()
