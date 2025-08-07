@@ -14,6 +14,18 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+def safe_float(val):
+    try:
+        return round(float(val), 6)
+    except:
+        return "N/A"
+
+def safe_dollar(val):
+    try:
+        return f"${float(val):,.0f}"
+    except:
+        return "N/A"
+
 def fetch_gecko_data(network: str, delay_between_calls: float = 2.5):
     base_url = f"https://api.geckoterminal.com/api/v2/networks/{network}/trending_pools"
     headers = {"accept": "application/json"}
@@ -50,10 +62,10 @@ def fetch_gecko_data(network: str, delay_between_calls: float = 2.5):
                 "Pool": pool_info.get("name", "N/A"),
                 "Base Token": pool_info.get("base_token", {}).get("name", "N/A"),
                 "Quote Token": pool_info.get("quote_token", {}).get("name", "N/A"),
-                "Price (USD)": pool_info.get("price_in_usd", "N/A"),
-                "Volume (24h)": pool_info.get("volume_usd_24h", "N/A"),
+                "Price (USD)": safe_float(pool_info.get("price_usd", "N/A")),
+                "Volume (24h)": safe_dollar(pool_info.get("volume_usd", "N/A")),
                 "Tx Count (24h)": pool_info.get("tx_count_24h", "N/A"),
-                "Link": f"[View](https://www.geckoterminal.com/network/{network_prefix}/pool/{pool_id})"
+                "Link": f"[View](https://www.geckoterminal.com/{network_prefix}/pools/{pool_id})"
             })
 
         except Exception as e:
@@ -62,7 +74,6 @@ def fetch_gecko_data(network: str, delay_between_calls: float = 2.5):
         time.sleep(delay_between_calls)
 
     return pool_data
-
 
 # Fetch and display Ethereum and Base separately
 eth_data = fetch_gecko_data("eth", delay_between_calls=2.5)
