@@ -12,14 +12,14 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-def get_top_risers(chain, top_n=20):
-    url = f"https://api.dexscreener.com/latest/dex/pairs/{chain}?page=1"
+def get_top_trending(chain, top_n=20):
+    url = f"https://api.dexscreener.com/latest/dex/trending/{chain}"
     try:
         r = requests.get(url, timeout=10)
         r.raise_for_status()
         data = r.json()
         pairs = data.get("pairs", [])
-        # Calculate 24h % change (some may be None or missing)
+        # Calculate 24h % change
         for p in pairs:
             try:
                 p["priceChangePct"] = float(str(p.get("priceChange", "0")).replace('%', ''))
@@ -39,23 +39,23 @@ def get_top_risers(chain, top_n=20):
             })
         return table
     except Exception as e:
-        st.error(f"Failed to fetch pairs for {chain}: {e}")
+        st.error(f"Failed to fetch trending pairs for {chain}: {e}")
         return []
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### 🚀 Top 20 Rising Coins: Ethereum")
-    eth_data = get_top_risers("ethereum", top_n=20)
+    st.markdown("### 🚀 Top 20 Trending Coins: Ethereum")
+    eth_data = get_top_trending("ethereum", top_n=20)
     if eth_data:
         st.dataframe(pd.DataFrame(eth_data))
     else:
-        st.info("No rising coins found for Ethereum.")
+        st.info("No trending coins found for Ethereum.")
 
 with col2:
-    st.markdown("### 🛸 Top 20 Rising Coins: Base")
-    base_data = get_top_risers("base", top_n=20)
+    st.markdown("### 🛸 Top 20 Trending Coins: Base")
+    base_data = get_top_trending("base", top_n=20)
     if base_data:
         st.dataframe(pd.DataFrame(base_data))
     else:
-        st.info("No rising coins found for Base.")
+        st.info("No trending coins found for Base.")
