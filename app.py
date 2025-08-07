@@ -2,12 +2,15 @@ import streamlit as st
 import requests
 import pandas as pd
 
-st.set_page_config(page_title="Meme Coin Mega Tracker", layout="wide")
-st.markdown("## 🦎 Trending Meme Coins (via GeckoTerminal)")
+st.set_page_config(page_title="Trending Meme Coins", layout="wide")
 
-# Helper function to fetch trending pools from GeckoTerminal
+st.markdown(
+    "<h1 style='display: flex; align-items: center;'>🦎 Trending Meme Coins (via GeckoTerminal)</h1>",
+    unsafe_allow_html=True
+)
+
 def fetch_gecko_data(network):
-    url = f"https://api.geckoterminal.com/api/v2/networks/{network}/pools?sort=trending"
+    url = f"https://api.geckoterminal.com/api/v2/networks/{network}/trending_pools"
     try:
         response = requests.get(url)
         response.raise_for_status()
@@ -22,8 +25,8 @@ def fetch_gecko_data(network):
             price_usd = attr.get("price_usd", "N/A")
             volume_usd = attr.get("volume_usd", "N/A")
             tx_count = attr.get("tx_count_24h", "N/A")
-            url_slug = attr.get("url_slug", "")
-            pool_url = f"https://www.geckoterminal.com/network/{network}/pools/{url_slug}"
+            url_slug = item.get("id", "")
+            pool_url = f"https://www.geckoterminal.com/{network}/pools/{url_slug}"
 
             parsed.append({
                 "Pool": pool_name,
@@ -40,23 +43,25 @@ def fetch_gecko_data(network):
         st.error(f"API Error for {network.upper()}: {e}")
         return []
 
-# Layout
+# --- Fetch data ---
+eth_data = fetch_gecko_data("eth")
+base_data = fetch_gecko_data("base")
+
+# --- Layout ---
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("🚀 Ethereum Trending Pools")
-    eth_data = fetch_gecko_data("eth")
+    st.markdown("### 🚀 Ethereum Trending Pools")
     if eth_data:
-        df_eth = pd.DataFrame(eth_data)
-        st.dataframe(df_eth, use_container_width=True)
+        eth_df = pd.DataFrame(eth_data)
+        st.dataframe(eth_df, use_container_width=True)
     else:
-        st.warning("No Ethereum trending data found.")
+        st.info("No Ethereum trending data found.")
 
 with col2:
-    st.subheader("🪐 Base Trending Pools")
-    base_data = fetch_gecko_data("base")
+    st.markdown("### 🛸 Base Trending Pools")
     if base_data:
-        df_base = pd.DataFrame(base_data)
-        st.dataframe(df_base, use_container_width=True)
+        base_df = pd.DataFrame(base_data)
+        st.dataframe(base_df, use_container_width=True)
     else:
-        st.warning("No Base trending data found.")
+        st.info("No Base trending data found.")
