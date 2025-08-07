@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 
-st.set_page_config(page_title="🔥 Gecko Meme Coin Tracker", layout="wide")
+st.set_page_config(page_title="🦎 Gecko Meme Tracker", layout="wide")
 st.title("🦎 Trending Meme Coins (via GeckoTerminal)")
 
 @st.cache_data(ttl=60)
@@ -12,22 +12,24 @@ def fetch_gecko_data():
     try:
         response = requests.get(url, params=params, timeout=10)
         data = response.json()["data"]
-        
+
         trending = []
         for item in data:
-            attributes = item["attributes"]
-            token_info = attributes["base_token"]
-            trending.append({
-                "Token": token_info["name"],
-                "Symbol": token_info["symbol"],
-                "Price ($)": float(attributes["base_token_price_usd"]),
-                "24h Volume ($)": int(attributes["volume_usd"]["h24"]),
-                "Liquidity ($)": int(attributes["reserve_in_usd"]),
-                "DEX": attributes["dex_name"],
-                "Pair Link": f'https://www.geckoterminal.com/eth/pools/{item["id"].split("/")[-1]}'
-            })
+            try:
+                attr = item["attributes"]
+                token = attr["tokens"]["base"]
+                trending.append({
+                    "Token": token["name"],
+                    "Symbol": token["symbol"],
+                    "Price ($)": float(token.get("price_usd", 0.0)),
+                    "24h Volume ($)": float(attr.get("volume_usd", {}).get("h24", 0)),
+                    "Liquidity ($)": float(attr.get("reserve_in_usd", 0)),
+                    "DEX": attr.get("dex_name", ""),
+                    "Pair Link": f'https://www.geckoterminal.com/eth/pools/{item["id"].split("/")[-1]}'
+                })
+            except Exception as inner_err:
+                continue
 
-        # Sort by volume descending
         trending_sorted = sorted(trending, key=lambda x: x["24h Volume ($)"], reverse=True)
         return trending_sorted[:10]
 
@@ -35,8 +37,7 @@ def fetch_gecko_data():
         st.error(f"Error fetching data: {e}")
         return []
 
-# Load and display
-with st.spinner("Loading live meme coins..."):
+with st.spinner("Loading data..."):
     coins = fetch_gecko_data()
 
 if coins:
