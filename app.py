@@ -9,6 +9,18 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+def safe_float(val):
+    try:
+        return round(float(val), 4)
+    except:
+        return "N/A"
+
+def safe_dollar(val):
+    try:
+        return f"${float(val):,.0f}"
+    except:
+        return "N/A"
+
 def fetch_gecko_data(network):
     url = f"https://api.geckoterminal.com/api/v2/networks/{network}/trending_pools"
     try:
@@ -22,8 +34,8 @@ def fetch_gecko_data(network):
             pool_name = attr.get("name", "Unknown")
             base_token = attr.get("base_token", {}).get("name", "N/A")
             quote_token = attr.get("quote_token", {}).get("name", "N/A")
-            price_usd = attr.get("price_usd", "N/A")
-            volume_usd = attr.get("volume_usd", "N/A")
+            price_usd = safe_float(attr.get("price_usd"))
+            volume_usd = safe_dollar(attr.get("volume_usd"))
             tx_count = attr.get("tx_count_24h", "N/A")
             url_slug = item.get("id", "")
             pool_url = f"https://www.geckoterminal.com/{network}/pools/{url_slug}"
@@ -32,8 +44,8 @@ def fetch_gecko_data(network):
                 "Pool": pool_name,
                 "Base Token": base_token,
                 "Quote Token": quote_token,
-                "Price (USD)": round(float(price_usd), 4) if price_usd else "N/A",
-                "Volume (24h)": f"${float(volume_usd):,.0f}" if volume_usd else "N/A",
+                "Price (USD)": price_usd,
+                "Volume (24h)": volume_usd,
                 "Tx Count (24h)": tx_count,
                 "Link": f"[View]({pool_url})"
             })
