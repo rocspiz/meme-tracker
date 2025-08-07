@@ -30,7 +30,13 @@ def fetch_gecko_data(network, delay_between_calls=1.2):
 
         trending = trending_resp.json().get("data", [])
         for item in trending:
-            pool_id = item["id"]
+            full_id = item["id"]  # e.g., "eth_0x123abc..."
+            parts = full_id.split("_")
+            if len(parts) != 2:
+                st.warning(f"Unexpected pool ID format: {full_id}")
+                continue
+
+            pool_id = parts[1]  # Remove 'eth_' or 'base_'
             pool_url = f"https://api.geckoterminal.com/api/v2/networks/{network}/pools/{pool_id}"
 
             try:
@@ -55,7 +61,7 @@ def fetch_gecko_data(network, delay_between_calls=1.2):
                 })
 
             except Exception as pool_err:
-                st.warning(f"Pool fetch error for {pool_id}: {pool_err}")
+                st.warning(f"Pool fetch error for {full_id}: {pool_err}")
 
         return detailed_data
 
